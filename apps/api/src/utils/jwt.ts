@@ -10,7 +10,7 @@ export const signToken = (userId: string, sessionId: string) => {
 
     const payload = {userId, sessionId};
     
-    const token = jwt.sign(payload, JWT_SECRET, {expiresIn: "15m"})
+    const token = jwt.sign(payload, JWT_SECRET, {expiresIn: "1d"});
     
 return token;
 }
