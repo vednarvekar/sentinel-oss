@@ -9,7 +9,7 @@ export const getUserByGithubId = async(githubId: string) => {
 
 export const createUserFromGithub = async(githubId: number, username: string, avatar_url: string) => {
     const result = await db.query(
-        "INSERT INTO users (github_id, username, avatar_url) VALUES ($1, $2, $3) RETURNING id, github_id, username, avatar_url",
+        "INSERT INTO users (github_id, username, avatar_url) VALUES ($1, $2, $3) ON CONFLICT (github_id) DO UPDATE SET username = EXCLUDED.username, avatar_url = EXCLUDED.avatar_url RETURNING id, github_id, username, avatar_url",
         [githubId, username, avatar_url]
     )
     return result.rows[0];

@@ -1,8 +1,12 @@
-import {server} from "../server.js"
 import { AUTHORIZE_URL } from "../config/github.js"
-import { FastifyRequest, FastifyReply } from "fastify";
-import "dotenv/config";
 import crypto from "node:crypto"
+import { createUserFromGithub } from "../db/user.repo.js";
+import { createSession } from "../db/sessions.repo.js";
+import { FastifyRequest, FastifyReply } from "fastify";
+import { githubServices } from "../service/github.service.js";
+import {server} from "../server.js"
+import { signToken } from "../utils/jwt.js";
+import "dotenv/config";
 
 export async function authRoutes() {
     server.get("/auth/github", async(request: FastifyRequest, reply: FastifyReply) => {
@@ -16,10 +20,54 @@ export async function authRoutes() {
 
         const params = new URLSearchParams({
             client_id: process.env.GITHUB_CLIENT_ID || "",
+            redirect_uri: process.env.GITHUB_REDIRECT_URI!,
             scope: "read:user",
+            state: state,
         })
         return reply.redirect(`${AUTHORIZE_URL}?${params.toString()}`)
     })
 
-    server.get("/auth/github/callback", async(request: FastifyRequest, reply: FastifyReply) => {})
+
+
+    server.get("/auth/github/callback", async(request: FastifyRequest, reply: FastifyReply) => {
+        const {code, state} = request.query as {code:string, state:string};
+
+        if (!code) {
+            return reply.status(400).send({ error: "Missing OAuth code" });
+        }
+
+        const savedState = request.cookies.oauth_state;
+
+        if(!state || state !== savedState) {
+            return reply.status(401).send({ error: "State Mismatched / CSRF Detected"})
+        }
+
+        reply.clearCookie("oauth_state");
+        const ghToken = await githubServices.getAccessToken(code);
+
+        if(!ghToken) {
+            return reply.status(500).send({ error: "Failed to get GitHub Access Token"})
+        }
+
+        const ghProfile = await githubServices.getUserProfile(ghToken);
+
+        if (!ghProfile?.id || !ghProfile?.login) {
+            return reply.status(500).send({ error: "Invalid GitHub profile" });
+        }
+
+        const user = await createUserFromGithub(
+            ghProfile.id,
+            ghProfile.login,
+            ghProfile.avatar_url
+        )
+        
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+
+        const session = await createSession(user.id, expiresAt);
+        const jwt = signToken(user.id, session.id );
+
+    // 6. Final Redirect to Frontend Dashboard
+       return reply.redirect(`${process.env.FRONTEND_URL}/auth-success`);
+    })
 }
