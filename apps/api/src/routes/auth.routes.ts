@@ -1,12 +1,17 @@
 import { AUTHORIZE_URL } from "../config/github.js"
+
 import crypto from "node:crypto"
+
 import { createUserFromGithub } from "../db/user.repo.js";
 import { createSession } from "../db/sessions.repo.js";
+
 import { FastifyRequest, FastifyReply } from "fastify";
+
 import { githubServices } from "../service/github.service.js";
 import {server} from "../server.js"
 import { signToken } from "../utils/jwt.js";
-import "dotenv/config";
+import dotenv from "dotenv";
+dotenv.config();
 
 export async function authRoutes() {
     server.get("/auth/github", async(request: FastifyRequest, reply: FastifyReply) => {

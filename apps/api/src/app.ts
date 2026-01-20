@@ -1,6 +1,6 @@
 import {server} from "./server.js"
 import { db } from "./db/client.js";
-import { Result } from "pg";
+import { repoRoutes } from "./routes/repo.routes.js";
 
 export async function registerRoute() {
     server.get('/health', async() => {
@@ -15,4 +15,6 @@ export async function registerRoute() {
     server.get("/auth-success", async() => {
         return {time: Date.now(), status: "OK"};
     })
+
+    await server.register(repoRoutes)
 }
