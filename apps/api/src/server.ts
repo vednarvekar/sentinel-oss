@@ -1,21 +1,27 @@
 import Fastify from "fastify";
-import fastifyCookie from "@fastify/cookie";
-import { authRoutes } from "./routes/auth.routes.js";
+import cookie from '@fastify/cookie';
+import cors from "@fastify/cors";
 import "dotenv/config";
 
-export const server = Fastify({logger: true,});
+export const server = Fastify({logger: true});
 
-// Initialize 'user' so it can be safely attached in middleware
 server.decorateRequest('user', null);
 
-// TypeScript support: Define the user object shape
 declare module 'fastify' {
   interface FastifyRequest {
-    user: { id: string } | null;
+    user: { 
+      id: string;
+      githubToken: string;
+     } | null;
   }
 }
 
-server.register(fastifyCookie, {
-  secret: process.env.COOKIE_SECRET,
-})
-server.register(authRoutes);
+server.register(cookie, {
+  secret: "my-secret", // Optional: for signing cookies
+  parseOptions: {}     // Optional: default cookie options
+});
+
+server.register(cors, {
+  origin: "http://localhost:5555",
+  credentials: true,
+});

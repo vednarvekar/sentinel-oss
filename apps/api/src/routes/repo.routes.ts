@@ -1,10 +1,11 @@
 import { FastifyInstance } from "fastify";
 import { redis } from "../utils/redis.js";
-import { repoSearchQueue } from "../jobs/queues.js";
-
+import { repoIngestQueue, repoSearchQueue } from "../jobs/queues.js";
+import { requireAuth } from "../middleware/auth.middleware.js";
+import { getRepoByOwnerAndName } from "../db/repos.repo.js";
 
 export async function repoRoutes(server: FastifyInstance){
-    server.get("/repos/search", async(request, reply) => {
+    server.get("/repos/search", { preHandler: requireAuth }, async(request, reply) => {
         const {q} = request.query as {q?:string};
 
         if(!q) {
@@ -22,11 +23,33 @@ export async function repoRoutes(server: FastifyInstance){
             }
         }
 
-        await repoSearchQueue.add("search", {query: q})
+        await repoSearchQueue.add("search", {query: q, githubToken: request.user!.githubToken})
         return {
             status: "processing",
             source: "queue",
             data: [],
         }
-    })
-}
+    });
+
+    server.get("/repos/:owner/:name", {preHandler: requireAuth}, async(request, reply) => {
+        const {owner, name} = request.params as {
+            owner: string,
+            name: string,
+        };
+
+        const repo = await getRepoByOwnerAndName(owner, name);
+        if(!repo) {
+            await repoIngestQueue.add("repo-ingest", {owner, name, githubToken: request.user!.githubToken});
+            return {
+                status: "processing",
+                source: "queue",
+            }
+        }
+
+        return {
+            status: "ready",
+            source: "db",
+            data: repo,
+        }
+    });
+};

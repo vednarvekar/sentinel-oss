@@ -1,3 +1,4 @@
+import path from "node:path";
 import { db } from "./client.js";
 
 export const createOrUpdateRepo = async(owner: string, name: string, defaultBranch: string) => {
@@ -13,7 +14,31 @@ export const createOrUpdateRepo = async(owner: string, name: string, defaultBran
 };
 
 export const saveRepoFiles = async(repoId: string, files: {path:string; extension: string | null}[]) => {
-    for(const file of files) await db.query(
-        `INSERT INTO`
-    )
-}
+    if (files.length === 0) return;
+
+    const values: any[] =[];
+    const placeholders = files.map((file, i) => {
+        const offset = i * 3;
+        values.push(repoId, file.path, file.extension);
+
+        return `($${offset + 1}, $${offset + 2}, $${offset + 3})`;
+    }).join(",");
+
+    const query = `
+    INSERT INTO repo_files (repo_id, path, extention)
+    VALUES ${placeholders}
+    ON CONFLICT (repo_id, path) DO NOTHING`;
+    
+    await db.query(query, values);
+};
+
+export const getRepoByOwnerAndName = async(owner: string, name: string) => {
+    const result = await db.query(`
+        SELECT id, owner, name, default_branch, ingested_at 
+        FROM repos
+        WHERE owner = $1 AND name = $2`,
+        [owner, name]
+    );
+    return result.rows[0] ?? null;
+};
+

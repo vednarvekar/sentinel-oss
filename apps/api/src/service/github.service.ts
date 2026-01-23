@@ -1,13 +1,7 @@
 import { ACCESS_TOKEN_URL, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_REDIRECT_URI, USER_API_URL } from "../config/github.js"
-import { Agent } from "undici";
 import dns from "node:dns";
 
 dns.setDefaultResultOrder("ipv4first");
-
-const agent = new Agent({
-  connect: { family: 4 },
-});
-
 
 export const githubServices = {
     async getAccessToken(code: string) {
@@ -30,7 +24,7 @@ export const githubServices = {
             throw new Error("No access token from GitHub");
         }
 
-        return data.access_token as string || undefined;
+        return await data.access_token as string || undefined;
     },
 
     async getUserProfile(accessToken: string) {
@@ -41,6 +35,62 @@ export const githubServices = {
                 Accept: "application/vnd.github+json",
             }
         })
-        return response.json();
+        return await response.json();
+    },
+
+    async searchRepository(query: string, token: string){
+          const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&per_page=10`;
+        const reponse = await fetch(url, {
+            credentials: "include",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github+json",
+            },
+        })
+        
+        const data = await reponse.json();
+
+        return data.items.map((repo: any) => ({
+            id: repo.id,
+            owner: repo.owner.login,
+            name: repo.name,
+            full_name: repo.full_name,
+            stars: repo.stargazers_count,
+            description: repo.description,
+        }));
+    },
+
+    async getRepoMetaData(owner: string, name: string, token: string){
+        const url = `https://api.github.com/repos/${owner}/${name}`;
+
+        const response = await fetch(url, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github+json",
+            }
+        });
+
+        if(!response.ok){
+            throw new Error(`Repo metadata failed ${response.status}`)
+        }
+
+        return await response.json()
+    },
+
+    async getRepoTree(owner: string, name: string, branch: string, token: string){
+        const url = `https://api.github.com/repos/${owner}/${name}/git/trees/${branch}?recursive=1`
+
+        const response = await fetch(url, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github+json",
+            }
+        });
+
+        if(!response.ok){
+            throw new Error(`Repo tree failed ${response.status}`)
+        }
+
+        return await response.json()
     }
 }

@@ -3,6 +3,7 @@ import { registerRoute } from "./app.js"
 import "dotenv/config";
 import dns from "node:dns";
 dns.setDefaultResultOrder("ipv4first");
+import { db } from "./db/client.js";
 
 import {redis} from "./utils/redis.js"
 import "./jobs/repoSearch.worker.js"
@@ -10,6 +11,7 @@ import "./jobs/repoSearch.worker.js"
 const start = async() =>{
     try {
         await registerRoute();
+        await db.query("SELECT 1"); // This forces a connection. If DB is down, app crashes NOW (which is good).
 
         await redis.set("HealthCheck", "OK")
         const value = await redis.get("HealthCheck")

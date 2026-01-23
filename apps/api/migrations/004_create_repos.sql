@@ -9,9 +9,9 @@ CREATE TABLE if NOT EXISTS repos (
 );
 
 CREATE TABLE if NOT EXISTS repo_files (
-    if UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     repo_id UUID NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
     path TEXT NOT NULL,
-    extension TEXT,
+    extension TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );

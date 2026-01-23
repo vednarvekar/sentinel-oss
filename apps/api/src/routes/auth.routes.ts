@@ -63,7 +63,8 @@ export async function authRoutes() {
         const user = await createUserFromGithub(
             ghProfile.id,
             ghProfile.login,
-            ghProfile.avatar_url
+            ghProfile.avatar_url,
+            ghToken
         )
         
         const expiresAt = new Date();
@@ -72,7 +73,13 @@ export async function authRoutes() {
         const session = await createSession(user.id, expiresAt);
         const jwt = signToken(user.id, session.id );
 
-    // 6. Final Redirect to Frontend Dashboard
-       return reply.redirect(`${process.env.FRONTEND_URL}/auth-success`);
+        reply.setCookie("accessToken", jwt, {
+            path: "/",
+            httpOnly: true,
+            sameSite: "lax",
+            secure: false,
+            maxAge: 60 * 60 * 24,
+        });
+        return reply.redirect(`${process.env.FRONTEND_URL}/auth-success`);
     })
 }
