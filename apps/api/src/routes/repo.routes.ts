@@ -38,7 +38,8 @@ export async function repoRoutes(server: FastifyInstance){
         };
 
         const repo = await getRepoByOwnerAndName(owner, name);
-        if(!repo) {
+        const STALE_MS = 24 * 60 * 60 * 1000;
+        if(!repo || Date.now() - new Date(repo.ingested_at).getTime() > STALE_MS) {
             await repoIngestQueue.add("repo-ingest", {owner, name, githubToken: request.user!.githubToken});
             return {
                 status: "processing",

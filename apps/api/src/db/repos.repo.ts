@@ -25,7 +25,7 @@ export const saveRepoFiles = async(repoId: string, files: {path:string; extensio
     }).join(",");
 
     const query = `
-    INSERT INTO repo_files (repo_id, path, extention)
+    INSERT INTO repo_files (repo_id, path, extension)
     VALUES ${placeholders}
     ON CONFLICT (repo_id, path) DO NOTHING`;
     

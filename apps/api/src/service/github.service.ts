@@ -9,7 +9,7 @@ export const githubServices = {
             method: 'POST',
             headers: {
                 "Content-Type": "application/json",
-                Accept: "application/json",
+                Accept: "application/vnd.github+json",
             },
             body: JSON.stringify({
                 client_id: GITHUB_CLIENT_ID,

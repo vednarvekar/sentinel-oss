@@ -7,6 +7,7 @@ import { db } from "./db/client.js";
 
 import {redis} from "./utils/redis.js"
 import "./jobs/repoSearch.worker.js"
+import "./jobs/repoIngest.worker.js"
 
 const start = async() =>{
     try {
