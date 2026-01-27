@@ -6,8 +6,6 @@ import { FastifyRequest, FastifyReply } from "fastify";
 // export const requireAuth = async(request: FastifyRequest, reply: FastifyReply) => {
     
 export const requireAuth = async (request: FastifyRequest, reply: FastifyReply) => {
-    console.log("HEADERS AUTH:", request.headers.authorization);
-    console.log("COOKIE TOKEN:", request.cookies.accessToken);
 
     const authHeader = request.headers.authorization;
     const cookieToken = request.cookies.accessToken;

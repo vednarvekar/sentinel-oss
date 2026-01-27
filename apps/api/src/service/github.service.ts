@@ -45,6 +45,7 @@ export const githubServices = {
             headers: {
                 Authorization: `Bearer ${token}`,
                 Accept: "application/vnd.github+json",
+                "User-Agent": "NodeJS-App"
             },
         })
         
@@ -92,5 +93,22 @@ export const githubServices = {
         }
 
         return await response.json()
-    }
+    },
+
+    async getRepoIssues(owner: string, name: string, token: string){
+        const url = `https://api.github.com/repos/${owner}/${name}/issues?state=open&per_page=30`;
+
+        const response = await fetch(url, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github+json",
+            }
+        });
+
+        if(!response.ok){
+            throw new Error(`Repo tree failed ${response.status}`)
+        }
+
+        return await response.json()
+    },
 }

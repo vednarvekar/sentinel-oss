@@ -1,29 +1,36 @@
-import {server} from "./server.js"
-import { registerRoute } from "./app.js"
 import "dotenv/config";
 import dns from "node:dns";
 dns.setDefaultResultOrder("ipv4first");
+
+import { server } from "./server.js";
+import { registerRoute } from "./app.js";
 import { db } from "./db/client.js";
+import { redis } from "./utils/redis.js";
 
-import {redis} from "./utils/redis.js"
-import "./jobs/repoSearch.worker.js"
-import "./jobs/repoIngest.worker.js"
+import { startWorkers } from "./workers.js";
 
-const start = async() =>{
-    try {
-        await registerRoute();
-        await db.query("SELECT 1"); // This forces a connection. If DB is down, app crashes NOW (which is good).
+async function start() {
+  try {
+    startWorkers();
+    
+    await registerRoute(server);
 
-        await redis.set("HealthCheck", "OK")
-        const value = await redis.get("HealthCheck")
-        console.log(`Redis test value ${value}`)
-        
-        await server.listen({port: 4004})
-        console.log(`API running on http://localhost:4004`)
+    // DB Check
+    await db.query("SELECT 1");
 
-    } catch (err) {
-        server.log.error(err);
-        process.exit(1);
-    }
+    // Redis Check
+    await redis.set("HealthCheck", "OK");
+    const value = await redis.get("HealthCheck");
+    console.log(`Redis test value ${value}`);
+
+    // Start server
+    await server.listen({ port: 4004 });
+    console.log("API running on http://localhost:4004");
+
+  } catch (err) {
+    server.log.error(err);
+    process.exit(1);
+  }
 }
+
 start();

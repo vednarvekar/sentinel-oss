@@ -6,7 +6,7 @@ export const createOrUpdateRepo = async(owner: string, name: string, defaultBran
         `INSERT INTO repos (owner, name, default_branch, ingested_at)
         VALUES ($1, $2, $3, NOW())
         ON CONFLICT (owner, name)
-        DO UPDATE SET ingested_at = NOW()
+        DO UPDATE SET ingested_at = NOW(), default_branch = EXCLUDED.default_branch
         RETURNING id`,
         [owner, name, defaultBranch]
     );
@@ -42,3 +42,10 @@ export const getRepoByOwnerAndName = async(owner: string, name: string) => {
     return result.rows[0] ?? null;
 };
 
+export const getRepoFileCount = async (repoId: string) => {
+  const res = await db.query(
+    "SELECT COUNT(*) FROM repo_files WHERE repo_id = $1",
+    [repoId]
+  );
+  return Number(res.rows[0].count);
+};

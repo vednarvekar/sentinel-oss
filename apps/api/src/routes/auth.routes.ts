@@ -1,20 +1,21 @@
 import { AUTHORIZE_URL } from "../config/github.js"
 
 import crypto from "node:crypto"
-
 import { createUserFromGithub } from "../db/user.repo.js";
 import { createSession } from "../db/sessions.repo.js";
 
-import { FastifyRequest, FastifyReply } from "fastify";
+import { FastifyInstance } from "fastify";
 
 import { githubServices } from "../service/github.service.js";
-import {server} from "../server.js"
+
 import { signToken } from "../utils/jwt.js";
+
 import dotenv from "dotenv";
 dotenv.config();
 
-export async function authRoutes() {
-    server.get("/auth/github", async(request: FastifyRequest, reply: FastifyReply) => {
+
+export async function authRoutes(server: FastifyInstance) {
+    server.get("/auth/github", async(request, reply) => {
         const state = crypto.randomBytes(16).toString("hex");
 
         reply.setCookie("oauth_state", state, {
@@ -34,7 +35,7 @@ export async function authRoutes() {
 
 
 
-    server.get("/auth/github/callback", async(request: FastifyRequest, reply: FastifyReply) => {
+    server.get("/auth/github/callback", async(request, reply) => {
         const {code, state} = request.query as {code:string, state:string};
 
         if (!code) {
