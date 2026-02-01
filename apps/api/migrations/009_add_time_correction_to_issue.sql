@@ -1,0 +1,11 @@
+-- Fix Issues Table
+ALTER TABLE issues 
+  ALTER COLUMN created_at TYPE TIMESTAMPTZ,
+  ALTER COLUMN updated_at TYPE TIMESTAMPTZ;
+
+-- Fix Analysis Table
+ALTER TABLE issue_analysis 
+  ALTER COLUMN analyzed_at TYPE TIMESTAMPTZ;
+
+ALTER TABLE issues ADD COLUMN IF NOT EXISTS ingested_at TIMESTAMPTZ DEFAULT NOW();
+

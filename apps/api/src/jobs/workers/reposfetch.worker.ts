@@ -1,6 +1,5 @@
 import { db } from "../../db/client.js";
-import { Worker, Job } from "bullmq";
-import {connection} from "../queues.js"
+import { Job } from "bullmq";
 import { redis } from "../../utils/redis.js";
 import { createOrUpdateRepo, saveRepoFiles } from "../../db/repos.repo.js";
 import { githubServices } from "../../service/github.service.js"
@@ -42,6 +41,7 @@ export async function repositoryFetchWorker(job: Job) {
         
         await redis.del(`repo:ingest:lock:${owner}:${name}`);
         console.log("INGEST COMPLETE:", owner, name);
+
     } catch (err) {
     console.error("❌ REPO INGEST FAILED:", err);
     throw err;

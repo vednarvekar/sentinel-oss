@@ -96,7 +96,7 @@ export const githubServices = {
     },
 
     async getRepoIssues(owner: string, name: string, token: string){
-        const url = `https://api.github.com/repos/${owner}/${name}/issues?state=open&per_page=30`;
+        const url = `https://api.github.com/repos/${owner}/${name}/issues?state=open&per_page=300`;
 
         const response = await fetch(url, {
             headers: {
