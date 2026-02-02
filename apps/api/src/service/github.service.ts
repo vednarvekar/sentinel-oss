@@ -95,20 +95,27 @@ export const githubServices = {
         return await response.json()
     },
 
-    async getRepoIssues(owner: string, name: string, token: string){
-        const url = `https://api.github.com/repos/${owner}/${name}/issues?state=open&per_page=300`;
-
+    async getRepoIssues(owner: string, name: string, token: string) {
+    // This query is what the GitHub search bar uses: "is:issue is:open"
+        const query = encodeURIComponent(`repo:${owner}/${name} is:issue is:open`);
+        const url = `https://api.github.com/search/issues?q=${query}&per_page=100&sort=created&order=desc`;
+        
         const response = await fetch(url, {
             headers: {
                 Authorization: `Bearer ${token}`,
                 Accept: "application/vnd.github+json",
+                "User-Agent": "Sentinel-OSS"
             }
         });
-
-        if(!response.ok){
-            throw new Error(`Repo tree failed ${response.status}`)
+        
+        if (!response.ok) {
+            throw new Error(`GitHub Search failed: ${response.status}`);
         }
-
-        return await response.json()
-    },
+        
+        const data = await response.json();
+        
+        // The Search API returns an object { total_count: X, items: [...] }
+        // We only want the items.
+        return data.items || [];
+}
 }

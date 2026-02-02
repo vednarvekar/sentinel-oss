@@ -79,6 +79,7 @@ export async function repoRoutes(server: FastifyInstance){
         data: repo
     };
 });
+
 // ------------------------------------------------------------------------------------------------
     server.get("/repos/:owner/:name/issues", { preHandler: requireAuth }, async (request, reply) => {
         const { owner, name } = request.params as { owner: string; name: string };
