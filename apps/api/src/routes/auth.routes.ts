@@ -1,15 +1,10 @@
 import { AUTHORIZE_URL } from "../config/github.js"
-
 import crypto from "node:crypto"
 import { createUserFromGithub } from "../db/user.repo.js";
 import { createSession } from "../db/sessions.repo.js";
-
 import { FastifyInstance } from "fastify";
-
 import { githubServices } from "../service/github.service.js";
-
 import { signToken } from "../utils/jwt.js";
-
 import dotenv from "dotenv";
 dotenv.config();
 

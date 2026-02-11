@@ -49,3 +49,18 @@ export const getRepoFileCount = async (repoId: string) => {
   );
   return Number(res.rows[0].count);
 };
+
+export const updateFileContent = async (repoId: string, path: string, content: string) => {
+    await db.query(
+        "UPDATE repo_files SET content = $1, last_fetched_at = NOW() WHERE repo_id = $2 AND path = $3",
+        [content, repoId, path]
+    );
+};
+
+// export const getRepoFilesForAnalysis = async (repoId: string) => {
+//     const res = await db.query(
+//         "SELECT path, content, last_fetched_at FROM repo_files WHERE repo_id = $1",
+//         [repoId]
+//     );
+//     return res.rows;
+// };

@@ -1,4 +1,5 @@
-import { ACCESS_TOKEN_URL, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_REDIRECT_URI, USER_API_URL } from "../config/github.js"
+import { ACCESS_TOKEN_URL, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_REDIRECT_URI, USER_API_URL } from 
+"../config/github.js"
 import dns from "node:dns";
 
 dns.setDefaultResultOrder("ipv4first");
@@ -117,5 +118,23 @@ export const githubServices = {
         // The Search API returns an object { total_count: X, items: [...] }
         // We only want the items.
         return data.items || [];
-}
+    },
+
+    async getFileContent(owner: string, name: string, path: string, token: string) {
+        const url = `https://api.github.com/repos/${owner}/${name}/contents/${path}`;
+
+        const response = await fetch(url, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github.v3.raw",
+                "User-Agent": "Sentinel-OSS"
+            }
+        });
+
+        if(!response.ok){
+            throw new Error(`Github file content fetch failed: ${response.status}`)
+        }
+
+        return await response.text();
+    }
 }

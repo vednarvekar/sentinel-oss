@@ -12,3 +12,5 @@ export const repoSearchQueue = new Queue("repo-search", {connection});
 export const repoIngestQueue = new Queue("repo-ingest", {connection});
 
 export const issueIngestQueue = new Queue("issue-ingest", {connection});
+
+export const analysisQueue = new Queue("analyze-issue", {connection});

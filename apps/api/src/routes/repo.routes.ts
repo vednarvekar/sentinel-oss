@@ -3,7 +3,10 @@ import { redis } from "../utils/redis.js";
 import { issueIngestQueue, repoIngestQueue, repoSearchQueue } from "../jobs/queues.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { getRepoByOwnerAndName, getRepoFileCount } from "../db/repos.repo.js";
-import { getAllIssuesByRepoId, getIssueByOwnerAndName, getIssueCount } from "../db/issues.repo.js";
+import { getAllIssuesByRepoId, getIssueCount } from "../db/issues.repo.js";
+import { getIssueForAnalysis } from "../db/analysis.repo.js";
+
+    // ------------------------------------------------------------------------------------------------
 
 export async function repoRoutes(server: FastifyInstance){
     server.get("/repos/search", { preHandler: requireAuth }, async(request, reply) => {
@@ -77,10 +80,9 @@ export async function repoRoutes(server: FastifyInstance){
     return {
         status: repo && !isStale ? "ready" : "processing",
         data: repo
-    };
-});
+    }});
 
-// ------------------------------------------------------------------------------------------------
+ // ------------------------------------------------------------------------------------------------
     server.get("/repos/:owner/:name/issues", { preHandler: requireAuth }, async (request, reply) => {
         const { owner, name } = request.params as { owner: string; name: string };
         
@@ -118,4 +120,21 @@ export async function repoRoutes(server: FastifyInstance){
             data: issues
         };
     });
+
+    server.get("/issues/:issueId/analysis", { preHandler: requireAuth }, async (request, reply) => {
+        const { issueId } = request.params as { issueId: string };
+        
+        const analysis = await getIssueForAnalysis(issueId);
+        if (!analysis) {
+            return reply.status(404).send({ status: "processing", message: "Analysis not ready yet" });
+        }
+        
+        return {
+            status: "ready",
+            data: analysis
+        }});
+
+    // ------------------------------------------------------------------------------------------------
+
 };
+
