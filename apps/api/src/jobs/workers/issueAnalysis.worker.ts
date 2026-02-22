@@ -1,6 +1,6 @@
 import { Job } from "bullmq";
 import { githubServices } from "../../service/github.service.js";
-import { computeSignals } from "../../service/analysis.logic.js";
+import { computeSignals } from "../../utils/analysis.logic.js";
 import { saveIssueAnalysis, getIssueForAnalysis, getRepoFilesForAnalysis, updateFileContent } 
 from "../../db/analysis.repo.js";
 
