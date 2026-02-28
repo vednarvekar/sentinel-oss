@@ -39,8 +39,8 @@ export async function repositoryFetchWorker(job: Job) {
         await db.query(`DELETE FROM repo_files WHERE repo_id = $1`, [repoId]);
         await saveRepoFiles(repoId, files);
         
-        await redis.del(`repo:ingest:lock:${owner}:${name}`);
-        console.log("INGEST COMPLETE:", owner, name);
+        // await redis.del(`repo:ingest:lock:${owner}:${name}`);
+        console.log("🏁 INGEST COMPLETE:", owner, name);
 
     } catch (err) {
     console.error("❌ REPO INGEST FAILED:", err);

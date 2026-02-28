@@ -10,12 +10,12 @@ export function computeSignals(
 
     // 2. Score the files
     const scoredFiles = files.map(file => {
-        const filePathLower = file.path.toLowerCase();
+        const filePathScore = file.path.toLowerCase();
         let score = 0;
         let signals: string[] = [];
 
         uniqueWords.forEach(word => {
-            if(filePathLower.includes(word)) {
+            if(filePathScore.includes(word)) {
                 score += 1;
                 signals.push(`Keyword: ${word}`);
             }
