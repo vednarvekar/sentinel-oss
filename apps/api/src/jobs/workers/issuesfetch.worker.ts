@@ -1,19 +1,18 @@
-import { Job, Worker } from "bullmq";
+import { Job } from "bullmq";
 import { githubServices } from "../../service/github.service.js";
 import { saveOrUpdateIssues } from "../../db/issues.repo.js";
 import { analysisQueue } from "../queues.js";
 
 interface MappedIssue {
   id: number;
-  repoId: any;
+  repoId: string;
   number: number;
   title: string;
   body: string | null;
   state: string;
   labels: any[];
-  created_at: string;
-  updated_at: string;
-  pull_request?: object; // GitHub search includes PRs by default
+  createdAt: string;
+  updatedAt: string;
 }
 
 export async function issuesFetchWorker(job: Job) {
@@ -53,8 +52,10 @@ export async function issuesFetchWorker(job: Job) {
                 githubToken,
             }, 
             opts: {
+                jobId: `analyze-issue-${issues.id}`,
                 attempts: 2,
-                removeOnComplete: true
+                removeOnComplete: true,
+                removeOnFail: true
             }
         }));
         

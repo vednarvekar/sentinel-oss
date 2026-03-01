@@ -1,8 +1,10 @@
 import { Job } from "bullmq";
 import { githubServices } from "../../service/github.service.js";
-import { computeSignals } from "../../utils/analysis.logic.js";
-import { saveIssueAnalysis, getIssueForAnalysis, getRepoFilesForAnalysis, updateFileContent } 
+import { computeSignals } from "../../logic/analysis.logic.js";
+import { saveIssueAnalysis, getIssueDataForAnalysis, getRepoFilesForAnalysis, updateFileContent } 
 from "../../db/analysis.repo.js";
+import { redis } from "../../utils/redis.js";
+import { cacheKeys, CacheTtlSeconds } from "../../utils/cache.keys.js";
 
 
 // issueAnalysis.worker.ts
@@ -10,16 +12,14 @@ export async function issueAnalysisWorker(job: Job) {
     const { issueId, repoId, owner, name, githubToken } = job.data;
 
     try {
-        const issue = await getIssueForAnalysis(issueId);
+        const issue = await getIssueDataForAnalysis(String(issueId));
         // We now need files WITH content and last_fetched_at
         const files = await getRepoFilesForAnalysis(repoId); 
         if (!issue) return;
 
         const signals = computeSignals(issue, files);
-        
-        // Use the Threshold logic: don't just slice(0,3)
-        // Take anything that is a strong match (score > 2)
-        const relevantMatches = signals.likelyPaths.filter(p => p.score >= 2);
+        const relevantMatches = signals.likelyPaths.slice(0, 15);
+        const keywords = signals.keywordsUsed.slice(0, 8);
 
         const verifiedPaths = await Promise.all(relevantMatches.map(async (match) => {
             let code = match.content;
@@ -39,49 +39,52 @@ export async function issueAnalysisWorker(job: Job) {
                 console.log(`⚡ Using Database Cache (Cache Hit): ${match.path}`);
             }
 
-            const isVerified = code?.toLowerCase().includes(issue.title.toLowerCase().split(' ')[0]);
-            return { ...match, verified: !!isVerified };
+            const normalizedCode = (code || "").toLowerCase();
+            const keywordHits = keywords.filter((keyword) => normalizedCode.includes(keyword)).length;
+            const titleWords = issue.title.toLowerCase().split(/\s+/).filter((word: string) => word.length >= 4);
+            const titleHits = titleWords.filter((word: string) => normalizedCode.includes(word)).length;
+            const isVerified = keywordHits >= 2 || titleHits >= 1;
+
+            return {
+                path: match.path,
+                score: match.score,
+                signals: match.signals,
+                verified: isVerified,
+                evidence: {
+                    keywordHits,
+                    titleHits,
+                },
+            };
         }));
+
+        const rankedPaths = verifiedPaths.sort((a, b) => {
+            if (a.verified !== b.verified) return a.verified ? -1 : 1;
+            return b.score - a.score;
+        });
 
         await saveIssueAnalysis({
             issueId,
-            likelyPaths: verifiedPaths,
+            likelyPaths: rankedPaths,
             difficulty: signals.difficulty,
             confidence: signals.confidence,
-            explanation: signals.explanation
+            explanation: `${signals.explanation} Keywords: ${signals.keywordsUsed.slice(0, 12).join(", ") || "none"}.`
         });
+
+        await redis.set(
+            cacheKeys.issueAnalysis(issueId),
+            JSON.stringify({
+                issueId,
+                likelyPaths: rankedPaths,
+                difficulty: signals.difficulty,
+                confidenceScore: signals.confidence,
+                explanation: `${signals.explanation} Keywords: ${signals.keywordsUsed.slice(0, 12).join(", ") || "none"}.`,
+            }),
+            "EX",
+            CacheTtlSeconds.issueAnalysis
+        );
 
         console.log(`✅ Successfully analyzed issue: ${issueId}`);
     } catch (err) {
         console.error("Analysis Worker Error:", err);
     }
 }
-
-
-
-
-
-
-// // 1. Import your AI service (we'll create this next)
-// import { aiService } from "../../service/ai.service.js";
-
-// // ... inside the worker after you have verifiedPaths ...
-
-// const cleanedBody = cleanGitHubBody(issue.body);
-
-// // 2. Call the AI to "Reason" about the retrieved files
-// const aiAnalysis = await aiService.analyzeIssue({
-//     title: issue.title,
-//     body: cleanedBody,
-//     files: verifiedPaths.map(p => ({ path: p.path, content: p.content }))
-// });
-
-// // 3. Save the "Smart" result
-// await saveIssueAnalysis({
-//     issueId,
-//     likelyPaths: verifiedPaths,
-//     difficulty: aiAnalysis.difficulty || signals.difficulty,
-//     confidence: aiAnalysis.confidence || signals.confidence,
-//     explanation: aiAnalysis.explanation, // This is now a human-readable AI explanation
-//     suggestedFix: aiAnalysis.suggestedFix // New column we need!
-// });

@@ -1,6 +1,7 @@
-import { Queue, Worker, Job } from "bullmq";
-import {connection} from "../queues.js"
+import { Job } from "bullmq";
+import { connection } from "../queues.js";
 import { githubServices } from "../../service/github.service.js";
+import { cacheKeys, CacheTtlSeconds } from "../../utils/cache.keys.js";
 
 export async function repositorySearchWorker (job: Job) {
         const {query, githubToken} = job.data;
@@ -8,7 +9,7 @@ export async function repositorySearchWorker (job: Job) {
     
         const response = await githubServices.searchRepository(query, githubToken)
     
-        const cachedKey = `repo:search:${query}`;
+        const cachedKey = cacheKeys.repoSearch(query);
 
-        await connection.set(cachedKey, JSON.stringify(response), "EX", 300)
+        await connection.set(cachedKey, JSON.stringify(response), "EX", CacheTtlSeconds.repoSearch)
 }

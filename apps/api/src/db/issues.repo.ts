@@ -31,7 +31,8 @@ export const saveOrUpdateIssues = async(issues: any[]) => {
         body = EXCLUDED.body,
         state = EXCLUDED.state,
         labels = EXCLUDED.labels,
-        updated_at = EXCLUDED.updated_at`
+        updated_at = EXCLUDED.updated_at,
+        ingested_at = NOW()`
 
     await db.query(query, values)
 };
@@ -64,4 +65,12 @@ export const getAllIssuesByRepoId = async (repoId: string) => {
         [repoId]
     );
     return res.rows;
+};
+
+export const getLatestIssueIngestAt = async (repoId: string) => {
+    const res = await db.query(
+        "SELECT MAX(ingested_at) AS latest_ingested_at FROM issues WHERE repo_id = $1",
+        [repoId]
+    );
+    return res.rows[0]?.latest_ingested_at ?? null;
 };

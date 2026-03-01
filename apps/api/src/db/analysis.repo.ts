@@ -22,18 +22,41 @@ export const saveIssueAnalysis = async (data: {
 
 
 export const getIssueForAnalysis = async (issueId: string) => {
-    const res = await db.query("SELECT title, body FROM issues WHERE id = $1", [issueId]);
+    const res = await db.query(`
+        SELECT issue_id, likely_paths, difficulty, confidence_score, explanation, analyzed_at
+        FROM issue_analysis
+        WHERE issue_id = $1`,
+        [issueId]
+    );
+    return res.rows[0] || null;
+};
+
+export const getIssueDataForAnalysis = async (issueId: string) => {
+    const res = await db.query(`
+        SELECT i.id, i.repo_id, i.title, i.body, i.labels, r.owner, r.name
+        FROM issues i
+        JOIN repos r ON r.id = i.repo_id
+        WHERE i.id = $1`,
+        [issueId]
+    );
     return res.rows[0] || null;
 };
 
 export const getRepoFilesForAnalysis = async (repoId: string) => {
-    const res = await db.query("SELECT path FROM repo_files WHERE repo_id = $1", [repoId]);
+    const res = await db.query(`
+        SELECT path, content, last_fetched_at
+        FROM repo_files 
+        WHERE repo_id = $1`,
+        [repoId]
+    );
     return res.rows;
 };
 
 export const updateFileContent = async (repoId: string, path: string, content: string) => {
     await db.query(
-        "UPDATE repo_files SET content = $1, last_fetched_at = NOW() WHERE repo_id = $2 AND path = $3",
+        `UPDATE repo_files 
+        SET content = $1, last_fetched_at = NOW() 
+        WHERE repo_id = $2 AND path = $3`,
         [content, repoId, path]
     );
 };

@@ -28,6 +28,8 @@ export const githubServices = {
         return await data.access_token as string || undefined;
     },
 
+// ---------------------------------------------------------------------------------------------------------------
+
     async getUserProfile(accessToken: string) {
         const response = await fetch(USER_API_URL, {
             headers: {
@@ -38,6 +40,8 @@ export const githubServices = {
         })
         return await response.json();
     },
+
+// ---------------------------------------------------------------------------------------------------------------
 
     async searchRepository(query: string, token: string){
           const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&per_page=10`;
@@ -62,7 +66,9 @@ export const githubServices = {
         }));
     },
 
-    async getRepoMetaData(owner: string, name: string, token: string){
+// ---------------------------------------------------------------------------------------------------------------
+
+    async getRepoOverviewData(owner: string, name: string, token: string){
         const url = `https://api.github.com/repos/${owner}/${name}`;
 
         const response = await fetch(url, {
@@ -78,6 +84,8 @@ export const githubServices = {
 
         return await response.json()
     },
+
+// ---------------------------------------------------------------------------------------------------------------
 
     async getRepoTree(owner: string, name: string, branch: string, token: string){
         const url = `https://api.github.com/repos/${owner}/${name}/git/trees/${branch}?recursive=1`
@@ -95,6 +103,8 @@ export const githubServices = {
 
         return await response.json()
     },
+
+// ---------------------------------------------------------------------------------------------------------------
 
     async getRepoIssues(owner: string, name: string, token: string) {
     // This query is what the GitHub search bar uses: "is:issue is:open"
@@ -120,6 +130,8 @@ export const githubServices = {
         return data.items || [];
     },
 
+// ---------------------------------------------------------------------------------------------------------------
+
     async getFileContent(owner: string, name: string, path: string, token: string) {
         const url = `https://api.github.com/repos/${owner}/${name}/contents/${path}`;
 
@@ -136,5 +148,51 @@ export const githubServices = {
         }
 
         return await response.text();
+    },
+
+// ---------------------------------------------------------------------------------------------------------------
+
+    async getFileImportsAndUrls(owner: string, name: string, path: string, token: string) {
+        const url = `https://api.github.com/repos/${owner}/${name}/contents/${path}`;
+    
+        const response = await fetch(url, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github.v3.raw",
+                "User-Agent": "Sentinel-OSS"
+            }
+        });
+    
+        if (!response.ok) {
+            throw new Error(`Github fetch failed: ${response.status}`);
+        }
+    
+        const content = await response.text();
+    
+        // --- NOW we run the extraction on the content we just fetched ---
+        const importRegex = /(?:import|from|require)\s*\(?\s*[`'"]([./][^`'"]+)[`'"]/g;
+        const urlRegex = /[`'"](\/[^`'"]+)[`'"]/g;
+    
+        const imports = new Set<string>();
+        const urls = new Set<string>();
+    
+        let match;
+        while ((match = importRegex.exec(content)) !== null) {
+            imports.add(match[1]);
+        }
+        while ((match = urlRegex.exec(content)) !== null) {
+            const foundPath = (match[1]);
+            const isTrash = /^[\/\-\s=_]+$/.test(foundPath);
+
+            if(!imports.has(foundPath) && foundPath !== '/' && !isTrash) {
+                urls.add(foundPath);
+            }
+        }
+
+        return {
+            content, // We return the content too so you don't have to fetch it twice!
+            imports: Array.from(imports),
+            urls: Array.from(urls)
+        };
     }
 }
