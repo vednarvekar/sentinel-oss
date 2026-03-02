@@ -15,10 +15,15 @@ export async function runFullAnalysis(issue: IssueSignalsInput, files: RepoFileI
     }
 
     // Step 2: Send top files to LLM
-    const aiAnalysis = await analyzeWithLLM(
-        issue,
-        localResult.likelyPaths
-    );
+    let aiAnalysis: string | null = null;
+    try {
+        aiAnalysis = await analyzeWithLLM(
+            issue,
+            localResult.likelyPaths
+        );
+    } catch (error) {
+        console.error("LLM analysis failed; returning local analysis only:", error);
+    }
 
     return {
         ...localResult,

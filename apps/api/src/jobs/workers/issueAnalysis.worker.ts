@@ -8,7 +8,6 @@
 // import { cacheKeys, CacheTtlSeconds } from "../../utils/cache.keys.js";
 
 import { Job } from "bullmq";
-import { computeSignals } from "../../logic/analysis.logic.js";
 import { runFullAnalysis } from "../../service/analysis.service.js";
 import { getRepoFilesForAnalysis, saveIssueAnalysis } from "../../db/analysis.repo.js";
 import { getIssueDataForAnalysis } from "../../db/issues.repo.js";
@@ -25,11 +24,20 @@ export async function issueAnalysisWorker(job: Job) {
         // 🔥 Run full analysis (local + LLM)
         const result = await runFullAnalysis(issue, files);
 
+        const matchCount = result.likelyPaths.length;
+        const difficulty =
+            matchCount === 0 ? "Unknown" :
+            matchCount <= 3 ? "Easy" :
+            matchCount <= 8 ? "Medium" : "Hard";
+        const confidence =
+            matchCount === 0 ? 0.1 :
+            Math.min(0.95, 0.45 + Math.min(0.45, (result.likelyPaths[0]?.score ?? 0) / 20));
+
        await saveIssueAnalysis({
         issueId,
         likelyPaths: result.likelyPaths,
-        difficulty: result.difficulty ?? "Medium",
-        confidence: result.confidence ?? 0.5,
+        difficulty,
+        confidence,
         explanation: result.explanation,
         aiSummary: result.aiAnalysis ?? null
 });

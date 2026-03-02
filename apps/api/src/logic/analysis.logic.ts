@@ -15,8 +15,8 @@ export type IssueSignalsInput = {
 export type RepoFileInput = {
     path: string;
     content?: string;
-    imports: string[];
-    urls: string[];
+    imports?: string[] | null;
+    urls?: string[] | null;
     last_fetched_at?: Date;
 };
 
@@ -61,6 +61,8 @@ export function computeSignals(issue: IssueSignalsInput, files: RepoFileInput[])
     const phase1 = files.map(file => {
         const pathLower = file.path.toLowerCase();
         const segments = pathLower.split(/[/.\\_-]+/g).filter(Boolean);
+        const imports = Array.isArray(file.imports) ? file.imports : [];
+        const urls = Array.isArray(file.urls) ? file.urls : [];
 
         let score = 0;
         const signals: string[] = [];
@@ -75,8 +77,8 @@ export function computeSignals(issue: IssueSignalsInput, files: RepoFileInput[])
             }
         }
 
-        if (file.imports?.length) {
-            const importsLower = file.imports.join(" ").toLowerCase();
+        if (imports.length) {
+            const importsLower = imports.join(" ").toLowerCase();
             for (const keyword of keywords) {
                 if (importsLower.includes(keyword)) {
                     score += 2;
@@ -85,8 +87,8 @@ export function computeSignals(issue: IssueSignalsInput, files: RepoFileInput[])
             }
         }
 
-        if (file.urls?.length) {
-            const urlsLower = file.urls.join(" ").toLowerCase();
+        if (urls.length) {
+            const urlsLower = urls.join(" ").toLowerCase();
             for (const keyword of keywords) {
                 if (urlsLower.includes(keyword)) {
                     score += 2;
@@ -95,7 +97,7 @@ export function computeSignals(issue: IssueSignalsInput, files: RepoFileInput[])
             }
         }
 
-        return { ...file, score, signals };
+        return { ...file, imports, urls, score, signals };
     });
 
     const phase1Top = phase1

@@ -7,6 +7,7 @@ type RankedFile = {
 
 export async function analyzeWithLLM(issue: IssueSignalsInput, rankedFiles: RankedFile[]) {
   if (!rankedFiles.length) return null;
+    if (!process.env.OPENROUTER_API_KEY) return null;
     const payload = {
         issue: {
             title: issue.title,
@@ -20,6 +21,7 @@ export async function analyzeWithLLM(issue: IssueSignalsInput, rankedFiles: Rank
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
+        signal: AbortSignal.timeout(20_000),
         headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`

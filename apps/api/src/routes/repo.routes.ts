@@ -3,8 +3,8 @@ import { redis } from "../utils/redis.js";
 import { analysisQueue, issueIngestQueue, repoIngestQueue, repoSearchQueue } from "../jobs/queues.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { getRepoByOwnerAndName, getRepoFileCount } from "../db/repos.repo.js";
-import { getAllIssues, getIssueCount, getLatestIssueIngest } from "../db/issues.repo.js";
-import { getIssueDataForAnalysis, getAnalysisResult } from "../db/analysis.repo.js";
+import { getAllIssues, getIssueCount, getLatestIssueIngest, getIssueDataForAnalysis } from "../db/issues.repo.js";
+import { getAnalysisResult } from "../db/analysis.repo.js";
 import { cacheKeys, CacheTtlSeconds } from "../utils/cache.keys.js";
 
     // ------------------------------------------------------------------------------------------------
