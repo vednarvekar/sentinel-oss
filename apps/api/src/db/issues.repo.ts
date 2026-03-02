@@ -37,19 +37,30 @@ export const saveOrUpdateIssues = async(issues: any[]) => {
     await db.query(query, values)
 };
 
-
-export const getIssueByOwnerAndName = async (owner: string, name: string) => {
-    // JOIN with repos because 'issues' table doesn't have owner/name columns
-    const result = await db.query(`
-        SELECT i.*, r.id as repo_db_id 
+export const getIssueDataForAnalysis = async (issueId: string) => {
+    const res = await db.query(`
+        SELECT i.id, i.repo_id, i.title, i.body, i.labels, r.owner, r.name
         FROM issues i
-        JOIN repos r ON i.repo_id = r.id
-        WHERE r.owner = $1 AND r.name = $2
-        LIMIT 1`, 
-        [owner, name]
+        JOIN repos r ON r.id = i.repo_id
+        WHERE i.id = $1`,
+        [issueId]
     );
-    return result.rows[0] ?? null;
+    return res.rows[0] || null;
 };
+
+
+// export const getIssueByOwnerAndName = async (owner: string, name: string) => {
+//     // JOIN with repos because 'issues' table doesn't have owner/name columns
+//     const result = await db.query(`
+//         SELECT i.*, r.id as repo_db_id 
+//         FROM issues i
+//         JOIN repos r ON i.repo_id = r.id
+//         WHERE r.owner = $1 AND r.name = $2
+//         LIMIT 1`, 
+//         [owner, name]
+//     );
+//     return result.rows[0] ?? null;
+// };
 
 export const getIssueCount = async (repoId: string) => {
     const res = await db.query(
@@ -59,7 +70,7 @@ export const getIssueCount = async (repoId: string) => {
     return Number(res.rows[0].count);
 };
 
-export const getAllIssuesByRepoId = async (repoId: string) => {
+export const getAllIssues = async (repoId: string) => {
     const res = await db.query(
         "SELECT * FROM issues WHERE repo_id = $1 ORDER BY number DESC",
         [repoId]
@@ -67,7 +78,7 @@ export const getAllIssuesByRepoId = async (repoId: string) => {
     return res.rows;
 };
 
-export const getLatestIssueIngestAt = async (repoId: string) => {
+export const getLatestIssueIngest = async (repoId: string) => {
     const res = await db.query(
         "SELECT MAX(ingested_at) AS latest_ingested_at FROM issues WHERE repo_id = $1",
         [repoId]

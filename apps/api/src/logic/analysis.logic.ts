@@ -1,47 +1,64 @@
 const STOP_WORDS = new Set([
-    "the", "and", "for", "with", "this", "that", "from", "when", "then",
-    "into", "your", "have", "does", "not", "are", "was", "were", "can",
-    "cannot", "could", "would", "issue", "error", "after", "before", "about",
-    "there", "their", "they", "them", "what", "where", "which", "while",
+    "the","and","for","with","this","that","from","when","then",
+    "into","your","have","does","not","are","was","were","can",
+    "cannot","could","would","after","before","about",
+    "there","their","they","them","what","where","which","while",
+    "fix","bug","problem"
 ]);
 
-const EXTENSION_HINTS: Record<string, string[]> = {
-    test: ["test", "spec"],
-    docs: ["md", "rst", "txt"],
-    api: ["ts", "tsx", "js", "jsx"],
-    types: ["d.ts", "ts"],
-};
-
-type IssueSignalsInput = {
+export type IssueSignalsInput = {
     title: string;
     body: string | null;
     labels?: unknown;
 };
 
-type RepoFileInput = {
+export type RepoFileInput = {
     path: string;
     content?: string;
+    imports: string[];
+    urls: string[];
     last_fetched_at?: Date;
 };
 
+// ---------------- KEYWORD EXTRACTION ----------------
 function extractKeywords(issue: IssueSignalsInput): string[] {
     const labels = Array.isArray(issue.labels)
-        ? issue.labels
-            .map((label: any) => String(label?.name ?? label ?? ""))
-            .join(" ")
+        ? issue.labels.map((l: any) => String(l?.name ?? l ?? "")).join(" ")
         : "";
 
-    const raw = `${issue.title} ${issue.body || ""} ${labels}`.toLowerCase();
-    const words = raw.match(/[a-z0-9_.-]{3,}/g) || [];
+    const raw = `${issue.title} ${issue.body || ""} ${labels}`
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .toLowerCase();
+
+    const words = raw.match(/[a-z0-9_]{3,}/g) || [];
+
     return Array.from(
-        new Set(words.filter((word) => !STOP_WORDS.has(word) && !/^\d+$/.test(word)))
+        new Set(words.filter(w => !STOP_WORDS.has(w) && !/^\d+$/.test(w)))
     );
+}
+
+// ---------------- SNIPPET EXTRACTION ----------------
+function extractSnippet(content: string, keywords: string[]): string {
+    const lines = content.split("\n");
+
+    for (let i = 0; i < lines.length; i++) {
+        const lower = lines[i].toLowerCase();
+
+        if (keywords.some(k => lower.includes(k))) {
+            const start = Math.max(0, i - 10);
+            const end = Math.min(lines.length, i + 11);
+            return lines.slice(start, end).join("\n");
+        }
+    }
+
+    return lines.slice(0, 20).join("\n");
 }
 
 export function computeSignals(issue: IssueSignalsInput, files: RepoFileInput[]) {
     const keywords = extractKeywords(issue);
 
-    const scoredFiles = files.map((file) => {
+    // ---------------- PHASE 1 ----------------
+    const phase1 = files.map(file => {
         const pathLower = file.path.toLowerCase();
         const segments = pathLower.split(/[/.\\_-]+/g).filter(Boolean);
 
@@ -49,80 +66,133 @@ export function computeSignals(issue: IssueSignalsInput, files: RepoFileInput[])
         const signals: string[] = [];
 
         for (const keyword of keywords) {
-            if (segments.includes(keyword)) {
+            if (segments.some(seg => seg.includes(keyword))) {
                 score += 3;
                 signals.push(`Path segment: ${keyword}`);
-                continue;
-            }
-
-            if (pathLower.includes(keyword)) {
+            } else if (pathLower.includes(keyword)) {
                 score += 1;
                 signals.push(`Path contains: ${keyword}`);
             }
         }
 
-        for (const [hint, extensions] of Object.entries(EXTENSION_HINTS)) {
-            if (keywords.includes(hint)) {
-                const matched = extensions.find((ext) => pathLower.endsWith(`.${ext}`) || pathLower.endsWith(ext));
-                if (matched) {
+        if (file.imports?.length) {
+            const importsLower = file.imports.join(" ").toLowerCase();
+            for (const keyword of keywords) {
+                if (importsLower.includes(keyword)) {
                     score += 2;
-                    signals.push(`Extension hint: ${hint} -> ${matched}`);
+                    signals.push(`Import match: ${keyword}`);
                 }
             }
         }
 
-        return {
-            path: file.path,
-            score,
-            signals,
-            content: file.content,
-            last_fetched_at: file.last_fetched_at,
-        };
+        if (file.urls?.length) {
+            const urlsLower = file.urls.join(" ").toLowerCase();
+            for (const keyword of keywords) {
+                if (urlsLower.includes(keyword)) {
+                    score += 2;
+                    signals.push(`URL match: ${keyword}`);
+                }
+            }
+        }
+
+        return { ...file, score, signals };
     });
 
-    const allMatches = scoredFiles
-        .filter((file) => file.score > 0)
-        .sort((a, b) => b.score - a.score);
+    const phase1Top = phase1
+        .filter(f => f.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 100);
 
-    const topScore = allMatches.length > 0 ? allMatches[0].score : 0;
-    const likelyPaths = allMatches
-        .filter((file) => file.score >= Math.max(2, Math.ceil(topScore * 0.5)))
-        .slice(0, 25);
+    // ---------------- PHASE 2 ----------------
+    const phase2 = phase1Top.map(file => {
+        let score = file.score;
+        const signals = [...file.signals];
 
-    let difficulty = "Easy";
-    if (likelyPaths.length === 0) {
-        difficulty = "Unknown";
-    } else if (likelyPaths.length > 8) {
-        difficulty = "Hard";
-    } else if (likelyPaths.length >= 4) {
-        difficulty = "Medium";
+        if (file.content) {
+            const contentLower = file.content.toLowerCase();
+            for (const keyword of keywords) {
+                const matches = contentLower.split(keyword).length - 1;
+                if (matches > 0) {
+                    score += matches * 2;
+                    signals.push(`Content: ${keyword} x${matches}`);
+                }
+            }
+        }
+
+        return { ...file, score, signals };
+    });
+
+    // ---------------- GRAPH BOOST (FORWARD + REVERSE) ----------------
+
+    const scoreMap = new Map<string, number>();
+    const reverseMap = new Map<string, string[]>();
+
+    // Build score map
+    for (const file of phase2) {
+        scoreMap.set(file.path, file.score);
     }
 
-    const confidence = Math.min(
-        0.95,
-        likelyPaths.length === 0 ? 0.1 : 0.45 + Math.min(0.45, topScore / 20)
-    );
+    // Build reverse dependency map
+    for (const file of phase2) {
+        for (const imp of file.imports) {
+            if (!reverseMap.has(imp)) reverseMap.set(imp, []);
+            reverseMap.get(imp)!.push(file.path);
+        }
+    }
+
+    for (const file of phase2) {
+        const baseScore = file.score;
+
+        // Forward boost (imports)
+        for (const imp of file.imports) {
+            if (scoreMap.has(imp)) {
+                scoreMap.set(imp, scoreMap.get(imp)! + baseScore * 0.2);
+            }
+        }
+
+        // Reverse boost (who imports this file)
+        const dependents = reverseMap.get(file.path) || [];
+        for (const dep of dependents) {
+            if (scoreMap.has(dep)) {
+                scoreMap.set(dep, scoreMap.get(dep)! + baseScore * 0.2);
+            }
+        }
+    }
+
+    const boostedRanked = phase2
+        .map(file => ({
+            ...file,
+            score: scoreMap.get(file.path) ?? file.score
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 25);
+
+    const topScore = boostedRanked.length > 0 ? boostedRanked[0].score : 0;
+
+    const likelyPaths = boostedRanked
+        .filter(f => f.score >= Math.max(2, Math.ceil(topScore * 0.5)))
+        .map(file => ({
+            path: file.path,
+            score: file.score,
+            signals: file.signals,
+            snippet: file.content
+                ? extractSnippet(file.content, keywords)
+                : null
+        }));
 
     return {
         likelyPaths,
-        difficulty,
-        confidence,
         keywordsUsed: keywords.slice(0, 40),
         explanation:
             likelyPaths.length > 0
-                ? `Ranked ${likelyPaths.length} likely files using issue keywords, label hints, and path weighting.`
-                : "No relevant file-path matches found from current issue text and labels.",
+                ? `Ranked ${likelyPaths.length} likely files using 2-phase scoring + dependency boost.`
+                : "No relevant matches found."
     };
 }
 
 
+
 export function cleanGitHubBody(body: string): string {
     if (!body) return "";
-
-    return body
-        // 1. Remove HTML comments .replace(//g, "")
-        // 2. Collapse multiple newlines into a clean double-newline
-        .replace(/\n\s*\n/g, "\n\n")
-        // 3. Trim whitespace from ends
-        .trim();
+    return body.replace(/\n\s*\n/g, "\n\n").trim();
 }

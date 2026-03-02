@@ -13,19 +13,34 @@ export const createOrUpdateRepo = async(owner: string, name: string, defaultBran
     return result.rows[0].id;
 };
 
-export const saveRepoFiles = async(repoId: string, files: {path:string; extension: string | null}[]) => {
-    if (files.length === 0) return;
+export const saveRepoFiles = async(
+    repoId: string,
+    fetchedFiles: {
+        path: string;
+        extension: string | null; 
+        imports: string[];
+        urls: string[];
+        content: string;
+    }[]
+) => {
+    if (fetchedFiles.length === 0) return;
 
     const values: any[] =[];
-    const placeholders = files.map((file, i) => {
-        const offset = i * 3;
-        values.push(repoId, file.path, file.extension);
-
-        return `($${offset + 1}, $${offset + 2}, $${offset + 3})`;
+    const placeholders = fetchedFiles.map((file, i) => {
+        const offset = i * 6;
+        values.push(
+            repoId, 
+            file.path, 
+            file.extension, 
+            JSON.stringify(file.imports), 
+            JSON.stringify(file.urls), 
+            JSON.stringify(file.content)
+        )
+        return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`;
     }).join(",");
 
     const query = `
-    INSERT INTO repo_files (repo_id, path, extension)
+    INSERT INTO repo_files (repo_id, path, extension, imports, urls, content)
     VALUES ${placeholders}
     ON CONFLICT (repo_id, path) DO NOTHING`;
     
@@ -50,9 +65,9 @@ export const getRepoFileCount = async (repoId: string) => {
   return Number(res.rows[0].count);
 };
 
-export const updateFileContent = async (repoId: string, path: string, content: string) => {
-    await db.query(
-        "UPDATE repo_files SET content = $1, last_fetched_at = NOW() WHERE repo_id = $2 AND path = $3",
-        [content, repoId, path]
-    );
-};
+// export const updateFileContent = async (repoId: string, path: string, content: string) => {
+//     await db.query(
+//         "UPDATE repo_files SET content = $1, last_fetched_at = NOW() WHERE repo_id = $2 AND path = $3",
+//         [content, repoId, path]
+//     );
+// };

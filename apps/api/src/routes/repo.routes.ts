@@ -3,8 +3,8 @@ import { redis } from "../utils/redis.js";
 import { analysisQueue, issueIngestQueue, repoIngestQueue, repoSearchQueue } from "../jobs/queues.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { getRepoByOwnerAndName, getRepoFileCount } from "../db/repos.repo.js";
-import { getAllIssuesByRepoId, getIssueCount, getLatestIssueIngestAt } from "../db/issues.repo.js";
-import { getIssueDataForAnalysis, getIssueForAnalysis } from "../db/analysis.repo.js";
+import { getAllIssues, getIssueCount, getLatestIssueIngest } from "../db/issues.repo.js";
+import { getIssueDataForAnalysis, getAnalysisResult } from "../db/analysis.repo.js";
 import { cacheKeys, CacheTtlSeconds } from "../utils/cache.keys.js";
 
     // ------------------------------------------------------------------------------------------------
@@ -100,8 +100,8 @@ export async function repoRoutes(server: FastifyInstance){
         
         // 2. Check current status
         const issueCount = await getIssueCount(repo.id);
-        const issues = await getAllIssuesByRepoId(repo.id);
-        const latestIssueIngestAt = await getLatestIssueIngestAt(repo.id);
+        const issues = await getAllIssues(repo.id);
+        const latestIssueIngestAt = await getLatestIssueIngest(repo.id);
         const lastIngest = latestIssueIngestAt ? new Date(latestIssueIngestAt).getTime() : 0;
         const isStale = (Date.now() - lastIngest) > (60 * 60 * 1000); 
         const needsIngest = issues.length === 0 || isStale;
@@ -138,18 +138,27 @@ export async function repoRoutes(server: FastifyInstance){
 
     server.get("/issues/:issueId/analysis", { preHandler: requireAuth }, async (request, reply) => {
         const { issueId } = request.params as { issueId: string };
+        const cacheKey = cacheKeys.issueAnalysis(issueId);
 
-        const cachedAnalysis = await redis.get(cacheKeys.issueAnalysis(issueId));
-        if (cachedAnalysis) {
+        // 1️⃣ Redis Cache
+        const cached = await redis.get(cacheKey);
+        if (cached) {
             return {
                 status: "ready",
                 source: "cache",
-                data: JSON.parse(cachedAnalysis),
+                data: JSON.parse(cached)
             };
         }
 
-        const analysis = await getIssueForAnalysis(issueId);
-        if (!analysis) {
+        // 2️⃣ Check DB
+        const analysis = await getAnalysisResult(issueId);
+
+        const isStale = analysis?.analyzed_at
+            ? (Date.now() - new Date(analysis.analyzed_at).getTime()) > (60 * 60 * 1000)
+            : true;
+
+        if (!analysis || isStale) {
+
             const issue = await getIssueDataForAnalysis(issueId);
             if (!issue) {
                 return reply.status(404).send({ error: "Issue not found" });
@@ -161,35 +170,38 @@ export async function repoRoutes(server: FastifyInstance){
 
             if (state !== "active" && state !== "waiting") {
                 if (existingJob) await existingJob.remove();
+
                 await analysisQueue.add(
                     "analyze-job",
                     {
                         issueId: issue.id,
-                        repoId: issue.repo_id,
-                        owner: issue.owner,
-                        name: issue.name,
-                        githubToken: request.user!.githubToken,
+                        repoId: issue.repo_id
                     },
                     {
                         jobId,
                         attempts: 2,
                         backoff: { type: "exponential", delay: 5000 },
                         removeOnComplete: true,
-                        removeOnFail: true,
+                        removeOnFail: true
                     }
                 );
             }
 
-            return reply.status(202).send({ status: "processing", message: "Analysis not ready yet" });
+            return reply.status(202).send({
+                status: "processing",
+                source: "queue"
+            });
         }
 
-        await redis.set(cacheKeys.issueAnalysis(issueId), JSON.stringify(analysis), "EX", CacheTtlSeconds.issueAnalysis);
+        // 3️⃣ Cache DB result
+        await redis.set(cacheKey, JSON.stringify(analysis), "EX", CacheTtlSeconds.issueAnalysis);
 
         return {
             status: "ready",
             source: "db",
             data: analysis
-        }});
+        };
+    });
 
     // ------------------------------------------------------------------------------------------------
 
